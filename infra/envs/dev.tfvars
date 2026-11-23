@@ -1,4 +1,4 @@
-project          = "acme" # TODO: replace with your project name (lowercase, short)
+project          = "testa" # TODO: replace with your project name (lowercase, short)
 environment      = "dev"
 primary_location = "centralindia"
 
