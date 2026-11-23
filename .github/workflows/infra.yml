@@ -1,0 +1,60 @@
+name: infra
+
+on:
+  pull_request:
+    paths: ['infra/**', '.github/workflows/infra.yml']
+  push:
+    branches: [main]
+    paths: ['infra/**', '.github/workflows/infra.yml']
+  workflow_dispatch:
+    inputs:
+      env:
+        description: Environment to apply
+        type: choice
+        options: [dev, test]
+        default: test
+
+env:
+  ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+  ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+  ARM_ACCESS_KEY: ${{ secrets.ARM_ACCESS_KEY }}
+  # JSON objects, e.g. {"API_KEY":"..."}; define as environment secrets per env
+  TF_VAR_gateway_secrets: ${{ secrets.GATEWAY_SECRETS_JSON || '{}' }}
+  TF_VAR_frontend_secrets: ${{ secrets.FRONTEND_SECRETS_JSON || '{}' }}
+  TARGET_ENV: ${{ inputs.env || 'dev' }}
+
+concurrency:
+  group: infra-${{ inputs.env || 'dev' }}
+  cancel-in-progress: false
+
+jobs:
+  tofu:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.env || 'dev' }} # test requires reviewer approval
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.8.x
+
+      - name: Init
+        run: tofu init -input=false -backend-config=envs/${TARGET_ENV}.backend.hcl
+
+      - name: Format check
+        run: tofu fmt -check -recursive
+
+      - name: Validate
+        run: tofu validate
+
+      - name: Plan
+        run: tofu plan -input=false -var-file=envs/${TARGET_ENV}.tfvars -out=plan
+
+      - name: Apply
+        if: github.event_name != 'pull_request'
+        run: tofu apply -input=false -auto-approve plan

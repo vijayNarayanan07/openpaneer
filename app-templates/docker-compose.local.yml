@@ -1,0 +1,17 @@
+# Local test without Azure: run your gateway against a local Postgres.
+#   docker compose -f docker-compose.local.yml up --build
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: pgadmin
+      POSTGRES_PASSWORD: localpass
+      POSTGRES_DB: appdb
+    ports: ["5432:5432"]
+  gateway:
+    build: .
+    environment:
+      PORT: "3000"
+      DATABASE_URL: postgresql://pgadmin:localpass@db:5432/appdb
+    ports: ["3000:3000"]
+    depends_on: [db]
